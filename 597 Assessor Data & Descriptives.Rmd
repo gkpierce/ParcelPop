@@ -20,9 +20,6 @@ library(tidyr)
 library(tableone)
 options(tigris_use_cache = TRUE)
 
-```
-
-```{r, echo=FALSE}
 
 # Requires downloading respective files from:
 # https://info.kingcounty.gov/assessor/datadownload/default.aspx
@@ -38,9 +35,9 @@ rb <- read_csv("EXTR_ResBldg.csv")
 ub <- read_csv("EXTR_UnitBreakdown.csv")
 comm <- read_csv("EXTR_CommBldg.csv")
 
-###################################################
-###### Convert to Daniel's Code to Tidyverse ######
-###################################################
+################################################
+###### Convert Daniel's Code to Tidyverse ######
+################################################
 
 # Process Apartment Data
 ac_summary <- ac %>%
@@ -73,10 +70,6 @@ condo_summary <- condo_summary %>% mutate(Minor = as.character(Minor))
 # Combine into one "Beds" dataset
 beds_combined <- bind_rows(ac_summary, rb_summary, condo_summary)
 
-```
-
-```{r, echo=FALSE}
-
 #####################################
 ###### Bedroom & Building Type ######
 #####################################
@@ -108,9 +101,6 @@ table1 <- CreateTableOne(vars = "Value", data = summary_data, strata = "Statisti
 print(table1)
 
 
-```
-
-```{r, echo=FALSE}
 
 ########################################
 ###### Lot Size: Convert to Acres ######
@@ -153,10 +143,3 @@ print(table1)
 
 
 
-```
-
-
-
-## Code Appendix
-
-```{r, ref.label=knitr::all_labels(),echo=TRUE,eval=FALSE}
