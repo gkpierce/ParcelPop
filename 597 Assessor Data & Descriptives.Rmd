@@ -1,0 +1,159 @@
+---
+title: "597 Assessor Data & Descrpitives"
+author: "Gavin Pierce"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(data.table)
+library(sf)
+library(stringr)
+library(tigris)
+library(usethis)
+library(dplyr)
+library(tidyr)
+library(tableone)
+options(tigris_use_cache = TRUE)
+
+```
+
+```{r, echo=FALSE}
+
+# Requires downloading respective files from:
+# https://info.kingcounty.gov/assessor/datadownload/default.aspx
+# Set to working individual computer directory
+lookup <- read_csv("EXTR_LookUp.csv")
+ac <- read_csv("EXTR_AptComplex.csv")
+parcel <- read_csv("EXTR_parcel.csv")
+condo <- read_csv("EXTR_CondoUnit2.csv")
+rb <- read_csv("EXTR_ResBldg.csv")
+ub <- read_csv("EXTR_UnitBreakdown.csv")
+comm <- read_csv("EXTR_CommBldg.csv")
+
+###################################################
+###### Convert to Daniel's Code to Tidyverse ######
+###################################################
+
+# Process Apartment Data
+ac_summary <- ac %>%
+  left_join(ub, by = c('Major', 'Minor')) %>%
+  mutate(nbeds = ifelse(NbrBedrooms == 'S', 1, as.numeric(NbrBedrooms))) %>%
+  mutate(nbeds = nbeds * as.numeric(NbrThisType)) %>%
+  group_by(Major, Minor) %>%
+  summarize(beds = sum(nbeds, na.rm = TRUE)) %>%
+  mutate(type = 'apt')
+
+# Process Residential Data
+rb_summary <- rb %>%
+  group_by(Major, Minor) %>%
+  summarize(beds = sum(Bedrooms, na.rm = TRUE)) %>%
+  mutate(type = 'res')
+
+# Process Condo Data
+condo_summary <- condo %>%
+  mutate(nbeds = ifelse(NbrBedrooms == 'S', 1, as.numeric(NbrBedrooms))) %>%
+  group_by(Major) %>%
+  summarize(beds = sum(nbeds, na.rm = TRUE)) %>%
+  mutate(Minor = 0, type = 'condo')
+
+# Ensure "Minor" matches across datasets
+ac_summary <- ac_summary %>% mutate(Minor = as.character(Minor))
+rb_summary <- rb_summary %>% mutate(Minor = as.character(Minor))
+condo_summary <- condo_summary %>% mutate(Minor = as.character(Minor))
+
+
+# Combine into one "Beds" dataset
+beds_combined <- bind_rows(ac_summary, rb_summary, condo_summary)
+
+```
+
+```{r, echo=FALSE}
+
+#####################################
+###### Bedroom & Building Type ######
+#####################################
+
+
+type_counts <- beds_combined %>%
+  count(type)
+
+# Mean & Median Beds
+mean_beds <- mean(beds_combined$beds, na.rm = TRUE)
+median_beds <- median(beds_combined$beds, na.rm = TRUE)
+
+# Tibble-ize Data
+summary_data <- tibble(
+  Statistic = c("Mean Beds", "Median Beds"),
+  Value = c(mean_beds, median_beds)
+)
+
+# Format Type Counts
+type_counts_formatted <- type_counts %>%
+  mutate(Statistic = paste("Count -", type),
+         Value = n)
+
+summary_data <- bind_rows(summary_data, type_counts_formatted[, c("Statistic", "Value")])
+
+# Tableone
+table1 <- CreateTableOne(vars = "Value", data = summary_data, strata = "Statistic", test = FALSE)
+
+print(table1)
+
+
+```
+
+```{r, echo=FALSE}
+
+########################################
+###### Lot Size: Convert to Acres ######
+########################################
+
+lot_size_stats <- parcel %>%
+  filter(PropType == "R") %>%
+  summarize(
+    mean_lot_size = mean(SqFtLot, na.rm = TRUE),
+    median_lot_size = median(SqFtLot, na.rm = TRUE),
+    sd_lot_size = sd(SqFtLot, na.rm = TRUE)
+  )
+
+parcel <- parcel %>%
+  filter(PropType == "R") %>%
+  mutate(
+    Acres = SqFtLot / 43560,
+    AcreCategory = case_when(
+      Acres < 1 ~ "Less than 1 acre",
+      Acres >= 1 & Acres <= 10 ~ "Between 1 and 10 acres",
+      Acres > 10 ~ "Greater than 10 acres"
+    )
+  )
+
+category_counts <- parcel %>%
+  count(AcreCategory)
+
+
+
+vars <- c("SqFtLot", "AcreCategory")
+
+if (length(unique(parcel$PropType)) < 2) {
+  print("PropType does not have 2+ levels. Creating table without stratification.")
+  table1 <- CreateTableOne(vars = vars, data = parcel, factorVars = "AcreCategory", test = FALSE)
+} else {
+  table1 <- CreateTableOne(vars = vars, data = parcel, strata = "PropType", factorVars = "AcreCategory", test = FALSE)
+}
+
+print(table1)
+
+
+
+```
+
+
+
+## Code Appendix
+
+```{r, ref.label=knitr::all_labels(),echo=TRUE,eval=FALSE}
