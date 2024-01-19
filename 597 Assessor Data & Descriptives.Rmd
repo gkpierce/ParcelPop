@@ -27,6 +27,9 @@ options(tigris_use_cache = TRUE)
 # Requires downloading respective files from:
 # https://info.kingcounty.gov/assessor/datadownload/default.aspx
 # Set to working individual computer directory
+
+### SETUP UNIVERSAL WORKING DIRECTORY CODE ###
+
 lookup <- read_csv("EXTR_LookUp.csv")
 ac <- read_csv("EXTR_AptComplex.csv")
 parcel <- read_csv("EXTR_parcel.csv")
