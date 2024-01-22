@@ -1,12 +1,3 @@
----
-title: "597 Assessor Data & Descrpitives"
-author: "Gavin Pierce"
-date: "`r Sys.Date()`"
-output: pdf_document
----
-
-knitr::opts_chunk$set(echo = TRUE)
-
 library(tidyverse)
 library(data.table)
 library(sf)
@@ -37,33 +28,33 @@ comm <- read_csv("EXTR_CommBldg.csv")
 ###### Convert Daniel's Code to Tidyverse ######
 ################################################
 
+# Convert 'Major' and 'Minor' to character in all datasets
+ac <- ac %>% mutate(Major = as.character(Major), Minor = as.character(Minor))
+ub <- ub %>% mutate(Major = as.character(Major), Minor = as.character(Minor))
+rb <- rb %>% mutate(Major = as.character(Major), Minor = as.character(Minor))
+condo <- condo %>% mutate(Major = as.character(Major), Minor = as.character(Minor))
+
 # Process Apartment Data
 ac_summary <- ac %>%
   left_join(ub, by = c('Major', 'Minor')) %>%
-  mutate(nbeds = ifelse(NbrBedrooms == 'S', 1, as.numeric(NbrBedrooms))) %>%
+  mutate(nbeds = ifelse(NbrBedrooms == 'S' | !is.numeric(as.character(NbrBedrooms)), 1, as.numeric(as.character(NbrBedrooms)))) %>%
   mutate(nbeds = nbeds * as.numeric(NbrThisType)) %>%
   group_by(Major, Minor) %>%
-  summarize(beds = sum(nbeds, na.rm = TRUE)) %>%
+  summarize(beds = sum(nbeds, na.rm = TRUE), .groups = 'drop') %>%
   mutate(type = 'apt')
 
 # Process Residential Data
 rb_summary <- rb %>%
   group_by(Major, Minor) %>%
-  summarize(beds = sum(Bedrooms, na.rm = TRUE)) %>%
+  summarize(beds = sum(Bedrooms, na.rm = TRUE), .groups = 'drop') %>%
   mutate(type = 'res')
 
 # Process Condo Data
 condo_summary <- condo %>%
-  mutate(nbeds = ifelse(NbrBedrooms == 'S', 1, as.numeric(NbrBedrooms))) %>%
-  group_by(Major) %>%
-  summarize(beds = sum(nbeds, na.rm = TRUE)) %>%
-  mutate(Minor = 0, type = 'condo')
-
-# Ensure "Minor" matches across datasets
-ac_summary <- ac_summary %>% mutate(Minor = as.character(Minor))
-rb_summary <- rb_summary %>% mutate(Minor = as.character(Minor))
-condo_summary <- condo_summary %>% mutate(Minor = as.character(Minor))
-
+  mutate(nbeds = ifelse(NbrBedrooms == 'S' | !is.numeric(as.character(NbrBedrooms)), 1, as.numeric(as.character(NbrBedrooms)))) %>%
+  group_by(Major, Minor) %>%
+  summarize(beds = sum(nbeds, na.rm = TRUE), .groups = 'drop') %>%
+  mutate(type = 'condo')
 
 # Combine into one "Beds" dataset
 beds_combined <- bind_rows(ac_summary, rb_summary, condo_summary)
@@ -71,7 +62,6 @@ beds_combined <- bind_rows(ac_summary, rb_summary, condo_summary)
 #####################################
 ###### Bedroom & Building Type ######
 #####################################
-
 
 type_counts <- beds_combined %>%
   count(type)
@@ -98,8 +88,6 @@ table1 <- CreateTableOne(vars = "Value", data = summary_data, strata = "Statisti
 
 print(table1)
 
-
-
 ########################################
 ###### Lot Size: Convert to Acres ######
 ########################################
@@ -125,8 +113,6 @@ parcel <- parcel %>%
 
 category_counts <- parcel %>%
   count(AcreCategory)
-
-
 
 vars <- c("SqFtLot", "AcreCategory")
 
